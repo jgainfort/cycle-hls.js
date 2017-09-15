@@ -1,0 +1,48 @@
+{
+  "name": "cycle-hls.js",
+  "version": "0.0.1",
+  "description": "hls.js driver for cycle.js",
+  "main": "index.js",
+  "scripts": {
+    "build": "node ./.scripts/build.js",
+    "lint": "tslint -c ./tslint.json 'src/**/*.ts' --exclude 'src/**/*.d.ts'",
+    "start": "node ./.scripts/start.js",
+    "test": "node ./.scripts/test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jgainfort/cycle-hls.js.git"
+  },
+  "keywords": [
+    "hls.js",
+    "cycle.js",
+    "driver"
+  ],
+  "author": "John G. Gainfort, Jr. <gainfortj@gmail.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/jgainfort/cycle-hls.js/issues"
+  },
+  "homepage": "https://github.com/jgainfort/cycle-hls.js#readme",
+  "devDependencies": {
+    "@cycle/run": "^3.2.0",
+    "@types/chai": "^4.0.4",
+    "@types/hls.js": "^0.7.5",
+    "@types/mocha": "^2.2.43",
+    "chai": "^4.1.2",
+    "chalk": "^2.1.0",
+    "cross-spawn": "^5.1.0",
+    "fs-extra": "^4.0.2",
+    "hls.js": "^0.8.2",
+    "mkdirp": "^0.5.1",
+    "mocha": "^3.5.3",
+    "progress-bar-webpack-plugin": "^1.10.0",
+    "ts-loader": "^2.3.7",
+    "ts-node": "^3.3.0",
+    "tslint": "^5.7.0",
+    "typescript": "^2.5.2",
+    "webpack": "^3.5.6",
+    "webpack-dev-server": "^2.8.2",
+    "xstream": "^10.9.0"
+  }
+}
