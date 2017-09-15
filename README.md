@@ -12,7 +12,7 @@ TODO: add notes on how to import the driver and use in a cycle.js app.
 
 ## How do I get set up?
 
-* Install (nodejs)[http://nodejs.org].
+* Install [nodejs](http://nodejs.org).
 * Type `npm i` at the prompt.
 * Type `npm run lint` at the prompt to check ts files for lint errors.
 * Type `npm test` at the prompt to run unit tests.
