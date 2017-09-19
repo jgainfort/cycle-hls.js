@@ -24,6 +24,7 @@
   },
   "homepage": "https://github.com/jgainfort/cycle-hls.js#readme",
   "devDependencies": {
+    "@cycle/dom": "^18.3.0",
     "@cycle/run": "^3.2.0",
     "@types/chai": "^4.0.4",
     "@types/hls.js": "^0.7.5",

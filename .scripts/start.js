@@ -12,7 +12,7 @@ const config = {
   entry: [
     `webpack-dev-server/client?${host}:${port.toString()}`,
     'webpack/hot/dev-server',
-    './src/index.ts'
+    './example/main.ts'
   ],
   output: {
     filename: 'bundle.js',
@@ -42,7 +42,7 @@ compiler.plugin('done', () => {
 const server = new WebpackDevServer(compiler, {
   historyApiFallback: true,
   hot: true,
-  contentBase: './public',
+  contentBase: './example',
   stats: 'errors-only'
 })
 server.listen(port)
