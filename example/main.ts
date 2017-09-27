@@ -8,22 +8,16 @@ interface Sources {
 }
 
 function main(sources: Sources) {
-  const hls$ = sources.Hls
+  const hlsSource = sources.Hls
+  const hls = hlsSource.init(0, 'video', 'https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8')
 
-  hls$.select(Hls.Events.MANIFEST_PARSED)
-    .map(ev => console.log('hls event: ', ev))
-
-  const sinks = {
-    Hls: xs.of({
-      events: [Hls.Events.MANIFEST_PARSED, Hls.Events.FRAG_BUFFERED]
-    })
+  return {
+    Hls: hls
   }
-
-  return sinks
 }
 
 const drivers = {
-  Hls: makeHlsjsDriver('video', 'https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8')
+  Hls: makeHlsjsDriver()
 }
 
 run(main, drivers)
