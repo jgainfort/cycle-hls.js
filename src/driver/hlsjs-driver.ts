@@ -1,5 +1,6 @@
 import { adapt } from '@cycle/run/lib/adapt'
-import xs, { Stream } from 'xstream'
+import { VNode } from '@cycle/dom'
+import xs, { Stream, MemoryStream } from 'xstream'
 import * as Hls from 'hls.js'
 import { HlsSource } from './HlsSource'
 
@@ -35,53 +36,81 @@ import { HlsSource } from './HlsSource'
 // }
 
 export interface HlsInstance {
-  id: number
   hls: Hls
   video: HTMLVideoElement
 }
 
 export function makeHlsjsDriver() {
   if (!Hls.isSupported()) {
-    throw new Error('MSE not supported in your browser')
+    throw new Error('MSE are not supported in your browser')
   }
 
   function hlsjsDriver(input$: Stream<any>, name = 'Hls') {
     let instances: HlsInstance[] = []
+    const instances$ = xs.of(instances)
+      .map(val => console.log('val: ', val))
 
-    input$.addListener({ next: val => console.log('val: ', val) })
+    function init(element$: MemoryStream<Element[]>, src: string, config: Hls.OptionalConfig = {}): Stream<HlsInstance[]> {
+      element$.addListener({
+        next: elArr => {
+          if (elArr.length > 0) {
+            const video = elArr[0] as HTMLVideoElement
 
-    function initHls(id: number, videoId: string, src: string, config: Hls.OptionalConfig = {}) {
-      if (!instances.some(instance => instance.id === id)) {
-        const video = document.getElementById(videoId) as HTMLVideoElement
-        const hls = new Hls(config)
-        hls.attachMedia(video)
+            if (!instances.some(val => val.video === video)) {
+              const hls = new Hls(config)
+              hls.attachMedia(video)
 
-        hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-          if (src) {
-            hls.loadSource(src)
+              hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+                if (src) {
+                  hls.loadSource(src)
+                }
+              })
+
+              instances = [...instances, { hls: hls, video: video }]
+            }
           }
-        })
+        }
+      })
 
-        instances = [...instances, { id: id, hls: hls, video: video }]
-      }
-
-      return adapt(xs.of(instances))
+      return adapt(instances$)
     }
 
-    function destroyHls(id: number) {
-      instances = instances.filter(instance => {
-        if (instance.id === id) {
-          instance.hls.destroy()
-          return false
-        }
-        return true
+    function get(events: string[]) {
+      const event$ = xs.create({
+        start: listener => {
+
+        },
+        stop: () => { }
       })
+
+      return adapt(event$)
+    }
+
+    function destroy(element$: MemoryStream<Element[]>) {
+      element$.subscribe({
+        next: (arr: Element[]) => {
+          if (arr.length > 0) {
+            const video = arr[0] as HTMLVideoElement
+            instances = instances.filter(val => {
+              let result = true
+              if (val.video === video) {
+                val.hls.destroy()
+                result = false
+              }
+              return result
+            })
+          }
+        },
+        error: () => { },
+        complete: () => { }
+      })
+
       return adapt(xs.of(instances))
     }
 
     return {
-      init: initHls,
-      destroy: destroyHls
+      init: init,
+      destroy: destroy
     }
   }
 

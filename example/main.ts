@@ -1,23 +1,94 @@
 import { run } from '@cycle/run'
+import isolate from '@cycle/isolate'
+import { div, h1, button, p, ul, DOMSource, VNode, makeDOMDriver } from '@cycle/dom'
+import onionify, { StateSource, makeCollection } from 'cycle-onionify'
 import xs, { Stream } from 'xstream'
 import { makeHlsjsDriver } from '../src'
-import * as Hls from 'hls.js'
+import Video, { State as VideoState, Sinks as VideoSinks } from './video'
+
+type Reducer = (prev?: State) => State | undefined
+
+interface State {
+  videos: VideoState[]
+}
 
 interface Sources {
+  DOM: DOMSource
+  onion: StateSource<State>
   Hls: any
 }
 
-function main(sources: Sources) {
-  const hlsSource = sources.Hls
-  const hls = hlsSource.init(0, 'video', 'https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8')
+interface Sinks {
+  DOM: Stream<VNode>,
+  onion: Stream<Reducer>
+}
 
+interface Actions {
+  add$: Stream<number>
+}
+
+function intent(domSource: DOMSource): Actions {
   return {
-    Hls: hls
+    add$: domSource.select('.addvideo').events('click').mapTo(1).startWith(0)
   }
 }
 
+function model(actions: Actions): Stream<Reducer> {
+  const initialReducer$ = xs.of((prev?: State): State => ({ videos: [] }))
+  const addReducer$ = actions.add$.map(count => (prevState: State): State => {
+    const len = prevState.videos.length
+    return {
+      videos: prevState.videos.concat({ id: len + 1 })
+    }
+  })
+  return xs.merge(initialReducer$, addReducer$)
+}
+
+function view(videosVNode$: Stream<VNode>): Stream<VNode> {
+  return videosVNode$.map(vnode =>
+    div([
+      h1('Cycle-hls.js'),
+      button('.addvideo', 'Add Video'),
+      vnode
+    ])
+  )
+}
+
+function main(sources: Sources): Sinks {
+
+  const Videos = makeCollection({
+    item: Video,
+    itemKey: (childState, index) => String(index),
+    itemScope: key => key,
+    collectSinks: instances => {
+      return {
+        DOM: instances.pickCombine('DOM')
+          .map((videoVNodes: VNode[]) => ul(videoVNodes)),
+        onion: instances.pickMerge('onion')
+      }
+    }
+  })
+
+  const videosSinks: VideoSinks = isolate(Videos, 'videos')(sources as any)
+  const action$ = intent(sources.DOM)
+  const parentReducer$ = model(action$)
+  const videoReducer$ = videosSinks.onion as any as Stream<Reducer>
+  const reducer$ = xs.merge(parentReducer$, videoReducer$)
+  const vdom$ = view(videosSinks.DOM)
+
+  const sinks: Sinks = {
+    DOM: vdom$,
+    onion: reducer$
+  }
+
+  return sinks
+}
+
+const wrappedMain = onionify(main)
+
 const drivers = {
+  DOM: makeDOMDriver('#main-container'),
   Hls: makeHlsjsDriver()
 }
 
-run(main, drivers)
+run(wrappedMain, drivers)
