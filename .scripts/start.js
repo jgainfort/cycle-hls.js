@@ -9,13 +9,16 @@ const port = 8000
 
 const config = {
   devtool: 'cheap-module-eval-source-map',
-  entry: [
-    `webpack-dev-server/client?${host}:${port.toString()}`,
-    'webpack/hot/dev-server',
-    './example/main.ts'
-  ],
+  entry: {
+    main: [
+      `webpack-dev-server/client?${host}:${port.toString()}`,
+      'webpack/hot/dev-server',
+      './example/main.ts'
+    ],
+    vendor: ['xstream', '@cycle/run', '@cycle/dom', '@cycle/isolate', 'cycle-onionify', 'hls.js']
+  },
   output: {
-    filename: 'bundle.js',
+    filename: '[name].js',
     path: '/'
   },
   resolve: {
@@ -25,7 +28,8 @@ const config = {
     rules: [
       {
         test: /\.ts$/,
-        loader: 'ts-loader'
+        loader: 'ts-loader',
+        exclude: /(node_modules)/
       }
     ]
   },

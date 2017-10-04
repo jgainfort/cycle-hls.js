@@ -7,8 +7,6 @@ const webpack = require('webpack')
 const ProgressBarPlugin = require('progress-bar-webpack-plugin')
 
 const buildPath = path.join(process.cwd(), 'build')
-const publicPath = path.join(process.cwd(), 'public')
-const licensePath = path.join(process.cwd(), 'LICENSE')
 
 mkdirp.sync(buildPath)
 
@@ -41,8 +39,5 @@ const compiler = webpack({
 compiler.run((err, stats) => {
   if (err) {
     console.log(err)
-  } else {
-    fs.copySync(licensePath, buildPath + '/LICENSE')
-    fs.copySync(publicPath, buildPath)
   }
 })

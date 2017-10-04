@@ -1,8 +1,8 @@
 import { adapt } from '@cycle/run/lib/adapt'
 import { VNode } from '@cycle/dom'
-import xs, { Stream, MemoryStream } from 'xstream'
+import xs, { Stream, MemoryStream, Producer } from 'xstream'
+import sampleCombine from 'xstream/extra/sampleCombine'
 import * as Hls from 'hls.js'
-import { HlsSource } from './HlsSource'
 
 // const api = {
 //   attachMedia: (): void => hls.attachMedia(videoElement),
@@ -24,20 +24,28 @@ import { HlsSource } from './HlsSource'
 //   version: (): string => Hls.version
 // }
 
-// function makeSelect(val: any, hls: any) {
-//   console.log('makeSelect > ', val)
-//   const source$ = xs.create({
-//     start: listener => {
-//       console.log('makeSelect listener > ', listener)
-//     },
-//     stop: () => { }
-//   })
-//   return adapt(source$)
-// }
+export interface Config {
+  element$: MemoryStream<Element[]>
+  sourceURL: string
+  config?: Hls.OptionalConfig
+}
+
+export interface HlsjsSource {
+  selectHlsEvent: (element$: MemoryStream<Element[]>, event: string) => Stream<HlsjsEvent>
+  selectVideoEvent: (element$: MemoryStream<Element[]>, event: string) => void
+  destroy: (element$: MemoryStream<Element[]>) => void
+}
+
+export interface HlsjsEvent {
+  type: string,
+  data: Hls.Data,
+  instance: HlsInstance
+}
 
 export interface HlsInstance {
   hls: Hls
   video: HTMLVideoElement
+  config: Config
 }
 
 export function makeHlsjsDriver() {
@@ -45,52 +53,59 @@ export function makeHlsjsDriver() {
     throw new Error('MSE are not supported in your browser')
   }
 
-  function hlsjsDriver(input$: Stream<any>, name = 'Hls') {
+  function hlsjsDriver(source$: MemoryStream<Config>): HlsjsSource {
+    // init instances
     let instances: HlsInstance[] = []
-    const instances$ = xs.of(instances)
-      .map(val => console.log('val: ', val))
 
-    function init(element$: MemoryStream<Element[]>, src: string, config: Hls.OptionalConfig = {}): Stream<HlsInstance[]> {
+    // create stream of instances
+    const instances$: Stream<HlsInstance[]> = xs.create({
+      start: listener => {
+        source$
+          .addListener({
+            next: source => {
+              source.element$.addListener({
+                next: elArr => {
+                  if (elArr.length > 0) {
+                    const video = elArr[0] as HTMLVideoElement
+
+                    if (!instances.some(val => val.video === video)) {
+                      const hls = new Hls(source.config ? source.config : {})
+                      hls.attachMedia(video)
+
+                      hls.on(Hls.Events.MEDIA_ATTACHED, () => {
+                        if (source.sourceURL) {
+                          hls.loadSource(source.sourceURL)
+                        }
+                      })
+
+                      instances = [...instances, { hls: hls, video: video, config: source }]
+                      listener.next(instances)
+                    }
+                  }
+                }
+              })
+            },
+            error: () => {
+              console.log('error: driver')
+            },
+            complete: () => {
+              console.log('complete: driver')
+            }
+          })
+      },
+      stop: () => { }
+    })
+
+    /**
+     * destroys hls.js instance no need to return
+     *
+     * @param {MemoryStream<Element[]>} element$
+     */
+    function destroy(element$: MemoryStream<Element[]>): void {
       element$.addListener({
         next: elArr => {
           if (elArr.length > 0) {
             const video = elArr[0] as HTMLVideoElement
-
-            if (!instances.some(val => val.video === video)) {
-              const hls = new Hls(config)
-              hls.attachMedia(video)
-
-              hls.on(Hls.Events.MEDIA_ATTACHED, () => {
-                if (src) {
-                  hls.loadSource(src)
-                }
-              })
-
-              instances = [...instances, { hls: hls, video: video }]
-            }
-          }
-        }
-      })
-
-      return adapt(instances$)
-    }
-
-    function get(events: string[]) {
-      const event$ = xs.create({
-        start: listener => {
-
-        },
-        stop: () => { }
-      })
-
-      return adapt(event$)
-    }
-
-    function destroy(element$: MemoryStream<Element[]>) {
-      element$.subscribe({
-        next: (arr: Element[]) => {
-          if (arr.length > 0) {
-            const video = arr[0] as HTMLVideoElement
             instances = instances.filter(val => {
               let result = true
               if (val.video === video) {
@@ -104,12 +119,61 @@ export function makeHlsjsDriver() {
         error: () => { },
         complete: () => { }
       })
+    }
 
-      return adapt(xs.of(instances))
+    /**
+     * Given a VNode and an hls event, subscribe to the event and pass to listener
+     *
+     * @param {MemoryStream<Element[]>} element$
+     * @param {string} event
+     * @returns {MemoryStream<HlsjsEvent>}
+     */
+    function selectHlsEvent(element$: MemoryStream<Element[]>, event: string): MemoryStream<HlsjsEvent> {
+      const event$ = xs.create({
+        start: listener => {
+          instances$
+            .compose(sampleCombine(element$))
+            .addListener({
+              next: ([instances, elArr]) => {
+                if (elArr.length > 0) {
+                  const video = elArr[0] as HTMLVideoElement
+                  const instance = instances.filter(val => val.video === video)[0]
+
+                  if (instance) {
+                    instance.hls.on(event, (event, data) => {
+                      listener.next({ type: event, data: data, instance: instance })
+                    })
+                  }
+                }
+              }
+            })
+        },
+        stop: () => { }
+      })
+
+      return adapt(event$)
+    }
+
+    function selectVideoEvent(element$: MemoryStream<Element[]>, event: string): void {
+      // TODO: in progress
+      instances$
+        .compose(sampleCombine(element$))
+        .addListener({
+          next: ([instances, elArr]) => {
+            if (elArr.length > 0) {
+              const video = elArr[0] as HTMLVideoElement
+              const instance = instances.filter(val => val.video === video)[0]
+
+              if (instance) {
+              }
+            }
+          }
+        })
     }
 
     return {
-      init: init,
+      selectHlsEvent: selectHlsEvent,
+      selectVideoEvent: selectVideoEvent,
       destroy: destroy
     }
   }

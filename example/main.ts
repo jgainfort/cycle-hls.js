@@ -20,7 +20,8 @@ interface Sources {
 
 interface Sinks {
   DOM: Stream<VNode>,
-  onion: Stream<Reducer>
+  onion: Stream<Reducer>,
+  hls: Stream<any>
 }
 
 interface Actions {
@@ -45,11 +46,11 @@ function model(actions: Actions): Stream<Reducer> {
 }
 
 function view(videosVNode$: Stream<VNode>): Stream<VNode> {
-  return videosVNode$.map(vnode =>
+  return videosVNode$.map(videosVNode =>
     div([
       h1('Cycle-hls.js'),
       button('.addvideo', 'Add Video'),
-      vnode
+      videosVNode
     ])
   )
 }
@@ -64,7 +65,8 @@ function main(sources: Sources): Sinks {
       return {
         DOM: instances.pickCombine('DOM')
           .map((videoVNodes: VNode[]) => ul(videoVNodes)),
-        onion: instances.pickMerge('onion')
+        onion: instances.pickMerge('onion'),
+        hls: instances.pickMerge('hls')
       }
     }
   })
@@ -78,7 +80,8 @@ function main(sources: Sources): Sinks {
 
   const sinks: Sinks = {
     DOM: vdom$,
-    onion: reducer$
+    onion: reducer$,
+    hls: videosSinks.hls
   }
 
   return sinks
@@ -88,7 +91,7 @@ const wrappedMain = onionify(main)
 
 const drivers = {
   DOM: makeDOMDriver('#main-container'),
-  Hls: makeHlsjsDriver()
+  hls: makeHlsjsDriver()
 }
 
 run(wrappedMain, drivers)
