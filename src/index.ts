@@ -1,1 +1,1 @@
-export { makeHlsjsDriver, Config, HlsjsSource, HlsjsEvent } from './driver/hlsjs-driver'
+export { makeHlsjsDriver, Config, HlsjsSource, HlsjsEvent, VideoEvent } from './driver/hlsjs-driver'

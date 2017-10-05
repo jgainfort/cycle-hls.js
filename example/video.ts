@@ -2,7 +2,7 @@ import { DOMSource, VNode, p, video, div, button, br } from '@cycle/dom'
 import xs, { Stream, MemoryStream } from 'xstream'
 import { StateSource } from 'cycle-onionify'
 import * as Hls from 'hls.js'
-import { HlsjsSource, HlsjsEvent, Config as HlsjsDriverConfig } from '../src'
+import { HlsjsSource, HlsjsEvent, VideoEvent, Config as HlsjsDriverConfig } from '../src'
 
 export type Reducer = (prev?: State) => State | undefined
 
@@ -38,8 +38,16 @@ function getBuffer(video: HTMLVideoElement): number {
   return buffer
 }
 
-function isState(val: State | HlsjsEvent): val is State {
+function getCurrentTime(video: HTMLVideoElement): number {
+  return video.currentTime
+}
+
+function isState(val: State | HlsjsEvent | VideoEvent): val is State {
   return (val as State).id !== undefined
+}
+
+function isVideoEvent(val: State | HlsjsEvent | VideoEvent): val is VideoEvent {
+  return (val as VideoEvent).event !== undefined
 }
 
 function Video(sources: Sources): Sinks {
@@ -53,12 +61,16 @@ function Video(sources: Sources): Sinks {
     config: {}
   })
 
-  const event$ = sources.hls.selectHlsEvent(element$, Hls.Events.FRAG_BUFFERED)
-  const vdom$ = xs.merge(state$, event$)
+  const hlsEvent$ = sources.hls.selectHlsEvent(element$, [Hls.Events.FRAG_BUFFERED])
+  const videoEvent$ = sources.hls.selectVideoEvent(element$, ['timeupdate'])
+
+  const vdom$ = xs.merge(state$, hlsEvent$, videoEvent$)
     .map(val => {
-      const result = { state: undefined, buffered: 0 }
+      const result = { state: undefined, buffered: 0, currentTime: 0 }
       if (isState(val)) {
         result.state = val
+      } else if (isVideoEvent(val)) {
+        result.currentTime = getCurrentTime(val.instance.video)
       } else {
         result.buffered = getBuffer(val.instance.video)
       }
@@ -77,7 +89,8 @@ function Video(sources: Sources): Sinks {
         button('.deletevideo', 'Delete Video'),
         br(),
         video('.video', { attrs: videoAttrs }),
-        p(`buffer: ${val.buffered}s`)
+        p(`buffer: ${val.buffered}s`),
+        p(`currentTime: ${val.currentTime}s`)
       ])
     })
 

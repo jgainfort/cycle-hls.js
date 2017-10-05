@@ -2,6 +2,7 @@ import { adapt } from '@cycle/run/lib/adapt'
 import { VNode } from '@cycle/dom'
 import xs, { Stream, MemoryStream, Producer } from 'xstream'
 import sampleCombine from 'xstream/extra/sampleCombine'
+import fromEvent from 'xstream/extra/fromEvent'
 import * as Hls from 'hls.js'
 
 // const api = {
@@ -31,14 +32,19 @@ export interface Config {
 }
 
 export interface HlsjsSource {
-  selectHlsEvent: (element$: MemoryStream<Element[]>, event: string) => Stream<HlsjsEvent>
-  selectVideoEvent: (element$: MemoryStream<Element[]>, event: string) => void
+  selectHlsEvent: (element$: MemoryStream<Element[]>, events: string[]) => Stream<HlsjsEvent>
+  selectVideoEvent: (element$: MemoryStream<Element[]>, events: string[]) => Stream<VideoEvent>
   destroy: (element$: MemoryStream<Element[]>) => void
 }
 
 export interface HlsjsEvent {
   type: string,
   data: Hls.Data,
+  instance: HlsInstance
+}
+
+export interface VideoEvent {
+  event: Event,
   instance: HlsInstance
 }
 
@@ -104,7 +110,7 @@ export function makeHlsjsDriver() {
     function destroy(element$: MemoryStream<Element[]>): void {
       element$.addListener({
         next: elArr => {
-          if (elArr.length > 0) {
+          if (elArr && elArr.length > 0) {
             const video = elArr[0] as HTMLVideoElement
             instances = instances.filter(val => {
               let result = true
@@ -128,20 +134,22 @@ export function makeHlsjsDriver() {
      * @param {string} event
      * @returns {MemoryStream<HlsjsEvent>}
      */
-    function selectHlsEvent(element$: MemoryStream<Element[]>, event: string): MemoryStream<HlsjsEvent> {
+    function selectHlsEvent(element$: MemoryStream<Element[]>, events: string[]): MemoryStream<HlsjsEvent> {
       const event$ = xs.create({
         start: listener => {
           instances$
             .compose(sampleCombine(element$))
             .addListener({
               next: ([instances, elArr]) => {
-                if (elArr.length > 0) {
+                if (elArr && elArr.length > 0) {
                   const video = elArr[0] as HTMLVideoElement
                   const instance = instances.filter(val => val.video === video)[0]
 
-                  if (instance) {
-                    instance.hls.on(event, (event, data) => {
-                      listener.next({ type: event, data: data, instance: instance })
+                  if (instance && events && events.length > 0) {
+                    events.forEach(event => {
+                      instance.hls.on(event, (type, data) => {
+                        listener.next({ type: type, data: data, instance: instance })
+                      })
                     })
                   }
                 }
@@ -154,21 +162,35 @@ export function makeHlsjsDriver() {
       return adapt(event$)
     }
 
-    function selectVideoEvent(element$: MemoryStream<Element[]>, event: string): void {
-      // TODO: in progress
-      instances$
-        .compose(sampleCombine(element$))
-        .addListener({
-          next: ([instances, elArr]) => {
-            if (elArr.length > 0) {
-              const video = elArr[0] as HTMLVideoElement
-              const instance = instances.filter(val => val.video === video)[0]
+    function selectVideoEvent(element$: MemoryStream<Element[]>, events: string[]): MemoryStream<VideoEvent> {
+      const event$ = xs.create({
+        start: listener => {
+          instances$
+            .compose(sampleCombine(element$))
+            .addListener({
+              next: ([instances, elArr]) => {
+                if (elArr && elArr.length > 0) {
+                  const video = elArr[0] as HTMLVideoElement
+                  const instance = instances.filter(val => val.video === video)[0]
 
-              if (instance) {
+                  if (instance && events && events.length > 0) {
+                    events.forEach(event => {
+                      fromEvent(instance.video, event)
+                        .addListener({
+                          next: ev => {
+                            listener.next({ event: ev, instance: instance })
+                          }
+                        })
+                    })
+                  }
+                }
               }
-            }
-          }
-        })
+            })
+        },
+        stop: () => { }
+      })
+
+      return adapt(event$)
     }
 
     return {
