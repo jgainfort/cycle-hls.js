@@ -4,6 +4,8 @@
 
 This is a Cycle.js driver to implement hls.js. 
 
+*STILL IN DEVELOPMENT*
+
 ## Getting Started
 
 TODO: add notes on how to import the driver and use in a cycle.js app. 
