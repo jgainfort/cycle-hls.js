@@ -35,6 +35,7 @@ export interface HlsjsSource {
   selectHlsEvent: (element$: MemoryStream<Element[]>, events: string[]) => Stream<HlsjsEvent>
   selectVideoEvent: (element$: MemoryStream<Element[]>, events: string[]) => Stream<VideoEvent>
   destroy: (element$: MemoryStream<Element[]>) => void
+  version: () => string
 }
 
 export interface HlsjsEvent {
@@ -193,10 +194,20 @@ export function makeHlsjsDriver() {
       return adapt(event$)
     }
 
+    function getVideoInstace(element$: MemoryStream<Element[]>) {
+      instances$
+        .compose(sampleCombine(element$))
+    }
+
+    function getVersion(): string {
+      return Hls.version
+    }
+
     return {
+      destroy: destroy,
       selectHlsEvent: selectHlsEvent,
       selectVideoEvent: selectVideoEvent,
-      destroy: destroy
+      version: getVersion
     }
   }
 

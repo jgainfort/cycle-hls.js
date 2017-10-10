@@ -7,7 +7,8 @@ import { HlsjsSource, HlsjsEvent, VideoEvent, Config as HlsjsDriverConfig } from
 export type Reducer = (prev?: State) => State | undefined
 
 export interface State {
-  id: number
+  sourceURL: string
+  config: Hls.OptionalConfig
 }
 
 export interface Sources {
@@ -43,7 +44,7 @@ function getCurrentTime(video: HTMLVideoElement): number {
 }
 
 function isState(val: State | HlsjsEvent | VideoEvent): val is State {
-  return (val as State).id !== undefined
+  return (val as State).sourceURL !== undefined
 }
 
 function isVideoEvent(val: State | HlsjsEvent | VideoEvent): val is VideoEvent {
@@ -55,27 +56,24 @@ function Video(sources: Sources): Sinks {
   const element$ = sources.DOM.select('.video').elements() as MemoryStream<Element[]>
   const hls = sources.hls
 
-  const hls$ = xs.of({
-    element$: element$,
-    sourceURL: 'https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8',
-    config: {}
-  })
+  const hls$ = state$.map(state =>
+    ({ element$: element$, sourceURL: state.sourceURL, config: state.config })
+  )
 
   const hlsEvent$ = sources.hls.selectHlsEvent(element$, [Hls.Events.FRAG_BUFFERED])
   const videoEvent$ = sources.hls.selectVideoEvent(element$, ['timeupdate'])
 
   const vdom$ = xs.merge(state$, hlsEvent$, videoEvent$)
-    .map(val => {
-      const result = { state: undefined, buffered: 0, currentTime: 0 }
-      if (isState(val)) {
-        result.state = val
-      } else if (isVideoEvent(val)) {
-        result.currentTime = getCurrentTime(val.instance.video)
+    .fold((acc: any, cur: State | HlsjsEvent | VideoEvent) => {
+      if (isState(cur)) {
+        acc.state = cur
+      } else if (isVideoEvent(cur)) {
+        acc.currentTime = getCurrentTime(cur.instance.video)
       } else {
-        result.buffered = getBuffer(val.instance.video)
+        acc.buffered = getBuffer(cur.instance.video)
       }
-      return result
-    })
+      return acc
+    }, { state: undefined, buffered: 0, currentTime: 0 })
     .map(val => {
       const videoAttrs = {
         muted: true,

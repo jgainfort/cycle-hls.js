@@ -37,9 +37,8 @@ function intent(domSource: DOMSource): Actions {
 function model(actions: Actions): Stream<Reducer> {
   const initialReducer$ = xs.of((prev?: State): State => ({ videos: [] }))
   const addReducer$ = actions.add$.map(count => (prevState: State): State => {
-    const len = prevState.videos.length
     return {
-      videos: prevState.videos.concat({ id: len + 1 })
+      videos: prevState.videos.concat({ sourceURL: 'https://video-dev.github.io/streams/x36xhzz/x36xhzz.m3u8', config: {} })
     }
   })
   return xs.merge(initialReducer$, addReducer$)
