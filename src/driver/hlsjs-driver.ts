@@ -57,7 +57,7 @@ export interface HlsInstance {
 
 export function makeHlsjsDriver() {
   if (!Hls.isSupported()) {
-    throw new Error('MSE are not supported in your browser')
+    throw new Error('MSE is not supported in your browser')
   }
 
   function hlsjsDriver(source$: MemoryStream<Config>): HlsjsSource {
